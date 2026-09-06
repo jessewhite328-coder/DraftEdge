@@ -55,6 +55,7 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
  .settingsgrid{grid-template-columns:1fr}
  h1{font-size:18px}
 }
+.draftTeamHead{background:#142238;border:1px solid var(--line);border-radius:7px;padding:7px 5px;font-size:10px;font-weight:900;text-align:center;width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.draftRound{background:#142238;border:1px solid var(--line);border-radius:7px;padding:6px;font-size:10px;font-weight:900;width:42px;display:flex;align-items:center;justify-content:center}.draftCell{width:110px;min-height:70px;border-radius:7px;padding:6px;color:#07111f}.draftCell.empty{background:#111d30;color:#71839c;border:1px dashed #30435f}.draftCell.qb{background:#e66a9b}.draftCell.rb{background:#78ddb8}.draftCell.wr{background:#55bde7}.draftCell.te{background:#f3a84e}.draftMeta{font-size:9px;font-weight:900;opacity:.75}.draftName{font-size:12px;font-weight:950;line-height:1.05;margin-top:5px}.draftTeam{font-size:9px;opacity:.75;margin-top:4px}
 </style>
 </head>
 <body>
@@ -68,7 +69,7 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
       <div class="stat"><div class="k">Current Pick</div><div class="v" id="pickNow">1</div></div>
       <div class="stat"><div class="k">Round</div><div class="v" id="roundNow">1.01</div></div>
       <div class="stat"><div class="k">On The Clock</div><div class="v" id="teamNow">Team 1</div></div>
-      <div class="stat"><div class="k">Next Dubsy Pick</div><div class="v" id="nextDubsy">9</div></div>
+      <div class="stat"><div class="k">My Next Pick</div><div class="v" id="nextDubsy">9</div></div>
     </div>
   </div>
 
@@ -84,7 +85,7 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
         <option value="recommend">Best recommendation</option>
         <option value="adp">ADP</option>
         <option value="proj">Projected points</option>
-        <option value="scarcity">Scarcity urgency</option>
+        <option value="scarcity">Lowest survival %</option>
       </select>
       <button class="btn" id="settingsBtn">Settings</button>
     </div>
@@ -99,19 +100,23 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
     <div class="tablewrap">
       <table>
         <thead><tr>
-          <th>Player</th><th>Pos</th><th>ADP</th><th>Proj</th><th>VORP</th><th>Wait Cost</th><th>Availability</th><th>Draft Score</th><th>Injury</th><th></th>
+          <th>Player</th><th>Pos</th><th>ADP</th><th>Proj</th><th>VORP</th><th>Survive</th><th>Tier Survive</th><th>Draft Score</th><th>Injury</th><th></th>
         </tr></thead>
         <tbody id="board"></tbody>
       </table>
     </div>
-    <p class="note">Availability is a “safe to wait” score: 75–100 = plentiful, 40–74 = thinning, 0–39 = critical. The app recalculates after every drafted player and estimates who may remain by your next pick.</p>
+    <p class="note">Survive = estimated chance the individual player is still available at your next pick. Tier Survive = chance at least one comparable player at that position remains. Both update after every pick.</p>
+  </div>
+  <div class="card" id="draftBoardCard" style="display:none">
+    <div class="headerrow"><div><h2 style="margin:0">Overall Draft Board</h2><div class="small">Snake draft • team columns • position-colored picks</div></div><button class="btn" id="backToAssistant">Back to Assistant</button></div>
+    <div class="tablewrap" style="margin-top:10px"><div id="draftGrid" style="display:grid;gap:3px;padding:5px;min-width:max-content"></div></div>
   </div>
 </div>
 
 <div class="footerbar">
   <div class="footerinner">
     <button class="btn undo" id="undoBtn">Undo Pick</button>
-    <button class="btn" id="jumpBtn">Top Available</button>
+    <button class="btn" id="jumpBtn">Draft Board</button>
     <button class="btn primary" id="advanceBtn">Advance Pick</button>
   </div>
 </div>
@@ -123,8 +128,11 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
       <label class="note">Teams<input id="teamsInput" type="number" min="8" max="16" value="12" style="width:100%;margin-top:4px"></label>
       <label class="note">Dubsy draft slot<input id="slotInput" type="number" min="1" max="12" value="9" style="width:100%;margin-top:4px"></label>
       <label class="note">Starting current pick<input id="pickInput" type="number" min="1" max="240" value="1" style="width:100%;margin-top:4px"></label>
-      <label class="note">Picks to simulate ahead<input id="simInput" type="number" min="1" max="30" value="0" style="width:100%;margin-top:4px"></label>
+      <label class="note">Draft board rounds<input id="roundsInput" type="number" min="8" max="25" value="15" style="width:100%;margin-top:4px"></label>
     </div>
+    <hr>
+    <h2 style="font-size:14px;margin:0 0 8px">Team Names</h2>
+    <div class="settingsgrid" id="teamNameFields"></div>
     <hr>
     <div class="settingsgrid">
       <label class="note">QB starter demand<input id="qbDemand" type="number" value="15" min="1" style="width:100%;margin-top:4px"></label>
@@ -140,15 +148,17 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 
 <script>
 const PLAYER_DATA = [{"status":"Available","adpRank":1,"name":"Jahmyr Gibbs","pos":"RB","sfAdp":"1.01","proj":347.7,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":2,"name":"Josh Allen","pos":"QB","sfAdp":"1.02","proj":454.4,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":3,"name":"Bijan Robinson","pos":"RB","sfAdp":"1.03","proj":374.5,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":4,"name":"Ja'Marr Chase","pos":"WR","sfAdp":"1.04","proj":370.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":5,"name":"Puka Nacua","pos":"WR","sfAdp":"1.05","proj":380.0,"injury":"🟢 Low","poolStatus":"Available","injuryReport":"Groin soreness: missed practice; expected Week 1 barring setback"},{"status":"Available","adpRank":6,"name":"Lamar Jackson","pos":"QB","sfAdp":"1.06","proj":397.6,"injury":"🟡 Monitor","poolStatus":"Available","injuryReport":"2025 hamstring/back plus knee/ankle/toe history; healthy upside, durability risk"},{"status":"Drafted","adpRank":7,"name":"Drake Maye","pos":"QB","sfAdp":"1.07","proj":387.8,"injury":"🟢 No current flag","poolStatus":"Projected keeper — nwichert","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":8,"name":"Christian McCaffrey","pos":"RB","sfAdp":"1.08","proj":395.4,"injury":"🟡 Monitor","poolStatus":"Available","injuryReport":"Tightness: missed practice; history makes recurrence worth monitoring"},{"status":"Drafted","adpRank":9,"name":"Jaxon Smith-Njigba","pos":"WR","sfAdp":"1.09","proj":299.0,"injury":"🟢 No current flag","poolStatus":"Dubsy keeper","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Drafted","adpRank":10,"name":"Brock Bowers","pos":"TE","sfAdp":"1.10","proj":247.0,"injury":"🟢 No current flag","poolStatus":"Projected keeper — TecmoBoJackson","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":11,"name":"Amon-Ra St. Brown","pos":"WR","sfAdp":"1.11","proj":310.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":12,"name":"Jonathan Taylor","pos":"RB","sfAdp":"1.12","proj":288.9,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":13,"name":"Justin Herbert","pos":"QB","sfAdp":"2.01","proj":352.4,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":14,"name":"Chase Brown","pos":"RB","sfAdp":"2.02","proj":292.5,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":15,"name":"Justin Jefferson","pos":"WR","sfAdp":"2.03","proj":270.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":16,"name":"CeeDee Lamb","pos":"WR","sfAdp":"2.04","proj":282.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":17,"name":"Omarion Hampton","pos":"RB","sfAdp":"2.05","proj":270.2,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":18,"name":"Caleb Williams","pos":"QB","sfAdp":"2.06","proj":360.1,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":19,"name":"Trey McBride","pos":"TE","sfAdp":"2.07","proj":269.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":20,"name":"Jalen Hurts","pos":"QB","sfAdp":"2.08","proj":359.4,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":21,"name":"James Cook","pos":"RB","sfAdp":"2.09","proj":321.2,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":22,"name":"Ashton Jeanty","pos":"RB","sfAdp":"2.10","proj":274.5,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":23,"name":"Joe Burrow","pos":"QB","sfAdp":"2.11","proj":364.1,"injury":"🟡 Monitor","poolStatus":"Available","injuryReport":"2025 injuries affected season; current draft risk remains elevated"},{"status":"Available","adpRank":24,"name":"Jayden Daniels","pos":"QB","sfAdp":"2.12","proj":388.1,"injury":"🟡 Monitor","poolStatus":"Available","injuryReport":"Prior injury concerns and 2025 injury-affected season; monitor durability"},{"status":"Available","adpRank":25,"name":"Dak Prescott","pos":"QB","sfAdp":"3.01","proj":356.1,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":26,"name":"Saquon Barkley","pos":"RB","sfAdp":"3.02","proj":260.6,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":27,"name":"De'Von Achane","pos":"RB","sfAdp":"3.03","proj":286.6,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":28,"name":"Trevor Lawrence","pos":"QB","sfAdp":"3.04","proj":339.7,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Drafted","adpRank":29,"name":"Kenneth Walker","pos":"RB","sfAdp":"3.05","proj":247.1,"injury":"🟢 No current flag","poolStatus":"Projected keeper — rswinton1","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Drafted","adpRank":30,"name":"Jaxson Dart","pos":"QB","sfAdp":"3.06","proj":357.4,"injury":"🟢 Low","poolStatus":"Dubsy keeper","injuryReport":"Ankle: returned to practice; monitoring only"},{"status":"Available","adpRank":31,"name":"A.J. Brown","pos":"WR","sfAdp":"3.07","proj":254.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":32,"name":"Derrick Henry","pos":"RB","sfAdp":"3.08","proj":277.7,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":33,"name":"Brock Purdy","pos":"QB","sfAdp":"3.09","proj":350.1,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Drafted","adpRank":34,"name":"Colston Loveland","pos":"TE","sfAdp":"3.10","proj":201.0,"injury":"🟢 No current flag","poolStatus":"Projected keeper — mganey","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":35,"name":"Drake London","pos":"WR","sfAdp":"3.11","proj":248.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":36,"name":"Patrick Mahomes","pos":"QB","sfAdp":"3.12","proj":348.4,"injury":"🟡 Monitor","poolStatus":"Available","injuryReport":"Knee: returning from ACL/MCL; Week 1 outlook optimistic, rushing may lag"},{"status":"Drafted","adpRank":37,"name":"Tyler Shough","pos":"QB","sfAdp":"4.01","proj":286.5,"injury":"🟢 No current flag","poolStatus":"Projected keeper — StuartD1","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":38,"name":"Kyler Murray","pos":"QB","sfAdp":"4.02","proj":315.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":39,"name":"Tyler Warren","pos":"TE","sfAdp":"4.03","proj":247.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":40,"name":"Malik Nabers","pos":"WR","sfAdp":"4.04","proj":220.0,"injury":"🔴 High","poolStatus":"Available","injuryReport":"Knee: ACL/meniscus recovery; limited ramp-up, team drills expected soon"},{"status":"Available","adpRank":41,"name":"Breece Hall","pos":"RB","sfAdp":"4.05","proj":227.7,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Drafted","adpRank":42,"name":"George Pickens","pos":"WR","sfAdp":"4.06","proj":267.0,"injury":"🟢 No current flag","poolStatus":"Projected keeper — TourPro","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":43,"name":"Rashee Rice","pos":"WR","sfAdp":"4.07","proj":268.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":44,"name":"Nico Collins","pos":"WR","sfAdp":"4.08","proj":258.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":45,"name":"Jeremiyah Love","pos":"RB","sfAdp":"4.09","proj":182.7,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":46,"name":"Jared Goff","pos":"QB","sfAdp":"4.10","proj":311.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Drafted","adpRank":47,"name":"Matthew Stafford","pos":"QB","sfAdp":"4.11","proj":338.4,"injury":"🟢 No current flag","poolStatus":"Projected keeper — jillklatt","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Drafted","adpRank":48,"name":"Bo Nix","pos":"QB","sfAdp":"4.12","proj":354.4,"injury":"🟢 No current flag","poolStatus":"Projected keeper — StuartD1","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":49,"name":"Baker Mayfield","pos":"QB","sfAdp":"5.01","proj":279.5,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":50,"name":"Chris Olave","pos":"WR","sfAdp":"5.02","proj":247.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":51,"name":"Kyren Williams","pos":"RB","sfAdp":"5.03","proj":252.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Drafted","adpRank":52,"name":"Jordan Love","pos":"QB","sfAdp":"5.04","proj":360.8,"injury":"🟢 No current flag","poolStatus":"Projected keeper — kjfossman","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":53,"name":"DeVonta Smith","pos":"WR","sfAdp":"5.05","proj":259.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Drafted","adpRank":54,"name":"Javonte Williams","pos":"RB","sfAdp":"5.06","proj":221.1,"injury":"🟢 No current flag","poolStatus":"Projected keeper — nwichert","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":55,"name":"Cam Skattebo","pos":"RB","sfAdp":"5.07","proj":172.5,"injury":"🟡 Monitor","poolStatus":"Available","injuryReport":"Major ankle/tibia recovery; expected Week 1, efficiency may ramp slowly"},{"status":"Available","adpRank":56,"name":"Josh Jacobs","pos":"RB","sfAdp":"5.08","proj":264.3,"injury":"🟡 Monitor","poolStatus":"Available","injuryReport":"Groin: expected to miss at least one week of camp"},{"status":"Available","adpRank":57,"name":"Zay Flowers","pos":"WR","sfAdp":"5.09","proj":222.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Drafted","adpRank":58,"name":"Emeka Egbuka","pos":"WR","sfAdp":"5.10","proj":200.0,"injury":"🟢 Low","poolStatus":"Projected keeper — kjfossman","injuryReport":"Toe sprain: considered minor/day-to-day"},{"status":"Available","adpRank":59,"name":"Malik Willis","pos":"QB","sfAdp":"5.11","proj":281.8,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":60,"name":"Ladd McConkey","pos":"WR","sfAdp":"5.12","proj":197.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":61,"name":"Luther Burden","pos":"WR","sfAdp":"6.01","proj":192.0,"injury":"🟡 Monitor","poolStatus":"Available","injuryReport":"Groin/leg: out for preseason; Week 1 expected but not guaranteed"},{"status":"Drafted","adpRank":62,"name":"Quinshon Judkins","pos":"RB","sfAdp":"6.02","proj":184.2,"injury":"🟢 No current flag","poolStatus":"Projected keeper — rswinton1","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":63,"name":"Tetairoa McMillan","pos":"WR","sfAdp":"6.03","proj":252.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":64,"name":"Bhayshul Tuten","pos":"RB","sfAdp":"6.04","proj":156.3,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":65,"name":"C.J. Stroud","pos":"QB","sfAdp":"6.05","proj":322.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":66,"name":"Jaylen Waddle","pos":"WR","sfAdp":"6.06","proj":239.0,"injury":"🟡 Monitor","poolStatus":"Available","injuryReport":"Muscle strain/leg: missed practice; expected short absence"},{"status":"Available","adpRank":67,"name":"D'Andre Swift","pos":"RB","sfAdp":"6.07","proj":202.2,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":68,"name":"Daniel Jones","pos":"QB","sfAdp":"6.08","proj":307.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":69,"name":"Garrett Wilson","pos":"WR","sfAdp":"6.09","proj":213.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Drafted","adpRank":70,"name":"Sam Darnold","pos":"QB","sfAdp":"6.10","proj":277.5,"injury":"🟢 No current flag","poolStatus":"Projected keeper — TourPro","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":71,"name":"Tee Higgins","pos":"WR","sfAdp":"6.11","proj":235.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":72,"name":"Travis Etienne","pos":"RB","sfAdp":"6.12","proj":205.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":73,"name":"Cam Ward","pos":"QB","sfAdp":"7.01","proj":256.1,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":74,"name":"David Montgomery","pos":"RB","sfAdp":"7.02","proj":148.1,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":75,"name":"Tucker Kraft","pos":"TE","sfAdp":"7.03","proj":215.0,"injury":"🟡 Monitor","poolStatus":"Available","injuryReport":"ACL recovery: expected Week 1; may need 4–6 weeks to regain normal workload"},{"status":"Available","adpRank":76,"name":"Terry McLaurin","pos":"WR","sfAdp":"7.04","proj":229.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Drafted","adpRank":77,"name":"Bucky Irving","pos":"RB","sfAdp":"7.05","proj":210.1,"injury":"🟡 Monitor","poolStatus":"Projected keeper — TecmoBoJackson","injuryReport":"Shoulder surgery plus foot/ankle history; expected lead role if healthy"},{"status":"Available","adpRank":78,"name":"TreVeyon Henderson","pos":"RB","sfAdp":"7.06","proj":203.9,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":79,"name":"Harold Fannin","pos":"TE","sfAdp":"7.07","proj":179.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":80,"name":"Bryce Young","pos":"QB","sfAdp":"7.08","proj":282.5,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":81,"name":"Davante Adams","pos":"WR","sfAdp":"7.09","proj":203.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":82,"name":"Kyle Pitts","pos":"TE","sfAdp":"7.10","proj":189.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":83,"name":"D.J. Moore","pos":"WR","sfAdp":"7.11","proj":243.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":84,"name":"Jadarian Price","pos":"RB","sfAdp":"7.12","proj":211.0,"injury":"🟢 Low","poolStatus":"Available","injuryReport":"Leg: returned to walkthrough after missing five practices"},{"status":"Drafted","adpRank":85,"name":"Rhamondre Stevenson","pos":"RB","sfAdp":"8.01","proj":157.4,"injury":"🟢 No current flag","poolStatus":"Projected keeper — mganey","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":86,"name":"Tony Pollard","pos":"RB","sfAdp":"8.02","proj":129.7,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":87,"name":"Parker Washington","pos":"WR","sfAdp":"8.03","proj":161.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":88,"name":"Aaron Rodgers","pos":"QB","sfAdp":"8.04","proj":253.1,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":89,"name":"Carnell Tate","pos":"WR","sfAdp":"8.05","proj":167.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Drafted","adpRank":90,"name":"Jaylen Warren","pos":"RB","sfAdp":"8.06","proj":183.2,"injury":"🟢 No current flag","poolStatus":"Projected keeper — jillklatt","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":91,"name":"Jacoby Brissett","pos":"QB","sfAdp":"8.07","proj":263.8,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":92,"name":"Rome Odunze","pos":"WR","sfAdp":"8.08","proj":206.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":93,"name":"Christian Watson","pos":"WR","sfAdp":"8.09","proj":207.0,"injury":"🟢 Low","poolStatus":"Available","injuryReport":"Prior ACL/hamstring history; currently described as healthy"},{"status":"Drafted","adpRank":94,"name":"Jameson Williams","pos":"WR","sfAdp":"8.10","proj":177.0,"injury":"🟢 No current flag","poolStatus":"Projected keeper — tylerswinton33","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":95,"name":"Mike Evans","pos":"WR","sfAdp":"8.11","proj":186.0,"injury":"🟡 Monitor","poolStatus":"Available","injuryReport":"Quad/soft tissue: sidelined; recurring soft-tissue history"},{"status":"Available","adpRank":96,"name":"Sam LaPorta","pos":"TE","sfAdp":"8.12","proj":167.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":97,"name":"George Kittle","pos":"TE","sfAdp":"9.01","proj":151.0,"injury":"🔴 High","poolStatus":"Available","injuryReport":"Achilles/knee: on PUP; expected back by Week 1 but explosiveness/availability risk"},{"status":"Available","adpRank":98,"name":"Fernando Mendoza","pos":"QB","sfAdp":"9.02","proj":128.2,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":99,"name":"Marvin Harrison Jr.","pos":"WR","sfAdp":"9.03","proj":198.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":100,"name":"Brian Thomas Jr.","pos":"WR","sfAdp":"9.04","proj":162.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":101,"name":"Travis Kelce","pos":"TE","sfAdp":"9.05","proj":181.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":102,"name":"Jonathon Brooks","pos":"RB","sfAdp":"9.06","proj":125.1,"injury":"🔴 High","poolStatus":"Available","injuryReport":"Repeat ACL history; healthy entering camp but elevated re-injury/performance risk"},{"status":"Available","adpRank":103,"name":"Geno Smith","pos":"QB","sfAdp":"9.07","proj":226.6,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":104,"name":"Isaiah Likely","pos":"TE","sfAdp":"9.08","proj":145.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":105,"name":"Jordyn Tyson","pos":"WR","sfAdp":"9.09","proj":168.0,"injury":"🔴 High","poolStatus":"Available","injuryReport":"Leg/hamstring: exited Aug. 13 practice; severity still being evaluated"},{"status":"Available","adpRank":106,"name":"Rico Dowdle","pos":"RB","sfAdp":"9.10","proj":143.3,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":107,"name":"Chuba Hubbard","pos":"RB","sfAdp":"9.11","proj":189.1,"injury":"🟡 Monitor","poolStatus":"Available","injuryReport":"Hamstring: week-to-week; team expects Week 1 but early limitation possible"},{"status":"Available","adpRank":108,"name":"RJ Harvey","pos":"RB","sfAdp":"9.12","proj":156.6,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":109,"name":"Courtland Sutton","pos":"WR","sfAdp":"10.01","proj":198.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":110,"name":"Blake Corum","pos":"RB","sfAdp":"10.02","proj":126.1,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":111,"name":"J.K. Dobbins","pos":"RB","sfAdp":"10.03","proj":129.3,"injury":"🟡 Monitor","poolStatus":"Available","injuryReport":"Soft tissue/hamstring: returned to limited practice; significant injury history"},{"status":"Available","adpRank":112,"name":"Dalton Kincaid","pos":"TE","sfAdp":"10.04","proj":192.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":113,"name":"Alec Pierce","pos":"WR","sfAdp":"10.05","proj":160.0,"injury":"🟡 Monitor","poolStatus":"Available","injuryReport":"Ankle: remains on PUP; expected ready for Week 1"},{"status":"Available","adpRank":114,"name":"Rachaad White","pos":"RB","sfAdp":"10.06","proj":148.2,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":115,"name":"Mark Andrews","pos":"TE","sfAdp":"10.07","proj":182.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":116,"name":"DK Metcalf","pos":"WR","sfAdp":"10.08","proj":187.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":117,"name":"Quentin Johnston","pos":"WR","sfAdp":"10.09","proj":142.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":118,"name":"Kenneth Gainwell","pos":"RB","sfAdp":"10.10","proj":147.1,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":119,"name":"Jake Ferguson","pos":"TE","sfAdp":"10.11","proj":176.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":120,"name":"Dallas Goedert","pos":"TE","sfAdp":"10.12","proj":131.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":121,"name":"Tua Tagovailoa","pos":"QB","sfAdp":"11.01","proj":306.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":122,"name":"Kyle Monangai","pos":"RB","sfAdp":"11.02","proj":123.9,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":123,"name":"Michael Pittman Jr.","pos":"WR","sfAdp":"11.03","proj":192.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":124,"name":"Chris Godwin","pos":"WR","sfAdp":"11.04","proj":179.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":125,"name":"Josh Downs","pos":"WR","sfAdp":"11.05","proj":209.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Drafted","adpRank":126,"name":"Jordan Mason","pos":"RB","sfAdp":"11.06","proj":120.7,"injury":"🟢 No current flag","poolStatus":"Projected keeper — tylerswinton33","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":127,"name":"Michael Wilson","pos":"WR","sfAdp":"11.07","proj":164.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":128,"name":"Wan'Dale Robinson","pos":"WR","sfAdp":"11.08","proj":156.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":129,"name":"Jacory Croskey-Merritt","pos":"RB","sfAdp":"11.09","proj":169.7,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":130,"name":"Chigoziem Okonkwo","pos":"TE","sfAdp":"11.10","proj":162.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":131,"name":"Jayden Reed","pos":"WR","sfAdp":"11.11","proj":163.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":132,"name":"Makai Lemon","pos":"WR","sfAdp":"11.12","proj":132.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":133,"name":"Oronde Gadsden","pos":"TE","sfAdp":"12.01","proj":121.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":134,"name":"Keaton Mitchell","pos":"RB","sfAdp":"12.02","proj":85.9,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":135,"name":"Matthew Golden","pos":"WR","sfAdp":"12.03","proj":144.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":136,"name":"Hunter Henry","pos":"TE","sfAdp":"12.04","proj":147.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":137,"name":"Tyrone Tracy","pos":"RB","sfAdp":"12.05","proj":111.9,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":138,"name":"Xavier Worthy","pos":"WR","sfAdp":"12.06","proj":162.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":139,"name":"Jakobi Meyers","pos":"WR","sfAdp":"12.07","proj":176.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":140,"name":"Stefon Diggs","pos":"WR","sfAdp":"12.08","proj":128.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":141,"name":"Jordan Addison","pos":"WR","sfAdp":"12.09","proj":137.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":142,"name":"Brenton Strange","pos":"TE","sfAdp":"12.10","proj":134.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":143,"name":"Juwan Johnson","pos":"TE","sfAdp":"12.11","proj":127.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":144,"name":"Aaron Jones","pos":"RB","sfAdp":"12.12","proj":164.7,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":145,"name":"T.J. Hockenson","pos":"TE","sfAdp":"13.01","proj":141.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":146,"name":"Chris Rodriguez","pos":"RB","sfAdp":"13.02","proj":104.1,"injury":"🟢 Low","poolStatus":"Available","injuryReport":"Foot: returned to practice after missing much of offseason"},{"status":"Available","adpRank":147,"name":"Zach Charbonnet","pos":"RB","sfAdp":"13.03","proj":131.1,"injury":"🔴 High","poolStatus":"Available","injuryReport":"ACL surgery Feb. 20; return more likely Oct/Nov than Week 1"},{"status":"Available","adpRank":148,"name":"KC Concepcion","pos":"WR","sfAdp":"13.04","proj":129.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":149,"name":"Dalton Schultz","pos":"TE","sfAdp":"13.05","proj":161.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":150,"name":"Deebo Samuel","pos":"WR","sfAdp":"13.06","proj":190.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":151,"name":"Khalil Shakir","pos":"WR","sfAdp":"13.07","proj":166.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":152,"name":"Woody Marks","pos":"RB","sfAdp":"13.08","proj":132.7,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":153,"name":"Kenyon Sadiq","pos":"TE","sfAdp":"13.09","proj":82.0,"injury":"🔴 High","poolStatus":"Available","injuryReport":"Hernia recovery setback: may be sidelined until near Week 1"},{"status":"Available","adpRank":154,"name":"Jalen Coker","pos":"WR","sfAdp":"13.10","proj":152.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":155,"name":"Romeo Doubs","pos":"WR","sfAdp":"13.11","proj":122.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":156,"name":"Tyjae Spears","pos":"RB","sfAdp":"13.12","proj":121.1,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":157,"name":"Dylan Sampson","pos":"RB","sfAdp":"14.01","proj":86.2,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":158,"name":"Kirk Cousins","pos":"QB","sfAdp":"14.02","proj":177.5,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":159,"name":"AJ Barner","pos":"TE","sfAdp":"14.03","proj":139.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":160,"name":"Deshaun Watson","pos":"QB","sfAdp":"14.04","proj":100.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":161,"name":"Isiah Pacheco","pos":"RB","sfAdp":"14.05","proj":72.9,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":162,"name":"Terrance Ferguson","pos":"TE","sfAdp":"14.06","proj":112.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":163,"name":"Tyler Allgeier","pos":"RB","sfAdp":"14.07","proj":66.2,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":164,"name":"Rashid Shaheed","pos":"WR","sfAdp":"14.08","proj":116.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":165,"name":"Alvin Kamara","pos":"RB","sfAdp":"14.09","proj":148.4,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":166,"name":"Greg Dulcich","pos":"TE","sfAdp":"14.10","proj":103.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":167,"name":"Jayden Higgins","pos":"WR","sfAdp":"14.11","proj":141.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":168,"name":"Shedeur Sanders","pos":"QB","sfAdp":"14.12","proj":146.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":169,"name":"De'Zhaun Stribling","pos":"WR","sfAdp":"15.01","proj":118.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":170,"name":"Tank Bigsby","pos":"RB","sfAdp":"15.02","proj":62.2,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":171,"name":"Jonah Coleman","pos":"RB","sfAdp":"15.03","proj":158.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":172,"name":"Cade Otton","pos":"TE","sfAdp":"15.04","proj":118.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":173,"name":"Gunnar Helm","pos":"TE","sfAdp":"15.05","proj":89.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":174,"name":"Pat Freiermuth","pos":"TE","sfAdp":"15.06","proj":113.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":175,"name":"Jalen McMillan","pos":"WR","sfAdp":"15.07","proj":115.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":176,"name":"Denzel Boston","pos":"WR","sfAdp":"15.08","proj":119.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":177,"name":"MarShawn Lloyd","pos":"RB","sfAdp":"15.09","proj":80.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":178,"name":"Tre Tucker","pos":"WR","sfAdp":"15.10","proj":125.0,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Available","adpRank":179,"name":"Michael Penix Jr.","pos":"QB","sfAdp":"15.11","proj":245.8,"injury":"🟢 No current flag","poolStatus":"Available","injuryReport":"No notable current injury flag found in reviewed reports."},{"status":"Drafted","adpRank":180,"name":"Brian Robinson","pos":"RB","sfAdp":"15.12","proj":57.9,"injury":"🟢 No current flag","poolStatus":"Projected keeper — Boom25Boom","injuryReport":"No notable current injury flag found in reviewed reports."}];
-const STORAGE_KEY = "dubsy88_draft_assistant_v2";
+const STORAGE_KEY = "dubsy88_draft_assistant_v3_nokeepers";
 const POSITIONS = ["QB","RB","WR","TE"];
 
 let state = {
-  teams:12, dubsySlot:9, currentPick:1,
-  baseDemand:{QB:15,RB:28,WR:44,TE:12},
+  teams:12, dubsySlot:9, currentPick:1, rounds:15,
+  teamNames:Array.from({length:12},(_,i)=>`Team ${i+1}`),
+  baseDemand:{QB:20,RB:30,WR:44,TE:12},
   draftedLive:[], history:[]
 };
 let activePos="ALL";
+let activeView="assistant";
 let sortBy="recommend";
 
 function loadState(){
@@ -162,11 +172,8 @@ function saveState(){
   const el=document.getElementById("saveState");
   el.textContent="● Saved locally";
 }
-function initialDraftedSet(){
-  return new Set(PLAYER_DATA.filter(p=>p.status==="Drafted").map(p=>p.name));
-}
 function liveDraftedSet(){ return new Set(state.draftedLive.map(x=>x.name)); }
-function isDrafted(p){ return p.status==="Drafted" || liveDraftedSet().has(p.name); }
+function isDrafted(p){ return liveDraftedSet().has(p.name); }
 
 function ownerSlot(pick){
   const n=state.teams, round=Math.ceil(pick/n), within=(pick-1)%n+1;
@@ -174,11 +181,11 @@ function ownerSlot(pick){
 }
 function teamNameForPick(pick){
   const slot=ownerSlot(pick);
-  return slot===state.dubsySlot ? "Dubsy88" : `Team ${slot}`;
+  return state.teamNames?.[slot-1] || `Team ${slot}`;
 }
 function roundLabel(pick){
-  const n=state.teams, r=Math.ceil(pick/n), within=(pick-1)%n+1;
-  return `${r}.${String(within).padStart(2,"0")}`;
+  const n=state.teams, r=Math.ceil(pick/n), slot=ownerSlot(pick);
+  return `${r}.${String(slot).padStart(2,"0")}`;
 }
 function nextPickForSlot(fromPick,slot){
   for(let p=Math.max(1,fromPick);p<=state.teams*20;p++) if(ownerSlot(p)===slot) return p;
@@ -187,63 +194,64 @@ function nextPickForSlot(fromPick,slot){
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 function pctClass(v){ return v>=75?"plenty":v>=40?"thin":"critical"; }
 
+function sigmoid(x){ return 1/(1+Math.exp(-x)); }
+function playerSurvivalProbability(p,picksAway,draftedByPos){
+  if(picksAway<=0) return 1;
+  let survive=1;
+  const posMult={QB:1.13,RB:1.04,WR:1.00,TE:.88}[p.pos]||1;
+  const pressure=1+Math.min(.22,(draftedByPos[p.pos]||0)*.008);
+  for(let step=0;step<picksAway;step++){
+    const absolutePick=state.currentPick+step;
+    const distance=absolutePick-(p.adpRank||999);
+    let hazard=.012+.31*sigmoid(distance/4.5);
+    hazard=clamp(hazard*posMult*pressure,.006,.68);
+    survive*=1-hazard;
+  }
+  return clamp(survive,0,1);
+}
 function metrics(){
-  const liveSet=liveDraftedSet();
   const available=PLAYER_DATA.filter(p=>!isDrafted(p));
   const draftedByPos={QB:0,RB:0,WR:0,TE:0};
   state.draftedLive.forEach(x=>{const p=PLAYER_DATA.find(z=>z.name===x.name);if(p&&draftedByPos[p.pos]!==undefined) draftedByPos[p.pos]++;});
+  let nextDubsy=nextPickForSlot(state.currentPick,state.dubsySlot);
+  let picksAway=Math.max(0,(nextDubsy||state.currentPick)-state.currentPick);
+  if(picksAway===0){ const after=nextPickForSlot(state.currentPick+1,state.dubsySlot); if(after) picksAway=after-state.currentPick; }
+  const survival={};
+  available.forEach(p=>survival[p.name]=playerSurvivalProbability(p,picksAway,draftedByPos));
   const posMetrics={};
-  const nextDubsy=nextPickForSlot(state.currentPick,state.dubsySlot);
-  const picksAway=Math.max(0,(nextDubsy||state.currentPick)-state.currentPick);
-  const expectedGone=[...available].sort((a,b)=>(a.adpRank??999)-(b.adpRank??999)).slice(0,picksAway);
-  const goneNames=new Set(expectedGone.map(p=>p.name));
-  const expectedAvail=available.filter(p=>!goneNames.has(p.name));
-
   for(const pos of POSITIONS){
     const pool=available.filter(p=>p.pos===pos).sort((a,b)=>b.proj-a.proj);
-    const expectedPool=expectedAvail.filter(p=>p.pos===pos).sort((a,b)=>b.proj-a.proj);
     const demand=Math.max(1,(state.baseDemand[pos]||1)-draftedByPos[pos]);
-    const repIndex=Math.min(pool.length-1,Math.max(0,demand-1));
-    const replacement=pool[repIndex]?.proj||0;
+    const replacement=pool[Math.min(pool.length-1,Math.max(0,demand-1))]?.proj||0;
     const best=pool[0]||null;
-    const bestNext=expectedPool[0]||pool[0]||null;
-    const waitCost=best ? Math.max(0,best.proj-(bestNext?.proj||0)) : 0;
+    let tier=[];
+    if(best){ tier=pool.filter((p,i)=>i<5&&p.proj>=best.proj*.92); if(tier.length<2) tier=pool.slice(0,Math.min(3,pool.length)); }
+    const tierSurvive=1-tier.reduce((prod,p)=>prod*(1-(survival[p.name]||0)),1);
+    const bestSurvive=best?(survival[best.name]||0):0;
+    const top3=pool.slice(0,3), den=top3.reduce((a,p)=>a+(survival[p.name]||0),0);
+    const expectedNext=top3.reduce((a,p)=>a+p.proj*(survival[p.name]||0),0)/Math.max(.001,den);
+    const waitCost=best?Math.max(0,best.proj-(Number.isFinite(expectedNext)?expectedNext:0)):0;
     const supplyRatio=pool.length/demand;
-    const topWindow=Math.min(pool.length,Math.max(3,Math.ceil(demand*.25)));
-    const qualityDepth=best && topWindow>0 ? (pool[Math.min(topWindow-1,pool.length-1)]?.proj||0)/Math.max(1,best.proj) : 0;
-    const supplyScore=clamp((supplyRatio-0.8)/1.2*100,0,100);
-    const qualityScore=clamp((qualityDepth-.55)/.4*100,0,100);
-    const waitPenalty=best ? clamp(waitCost/Math.max(1,best.proj)*240,0,100):100;
-    const availability=clamp(.55*supplyScore+.35*qualityScore+.10*(100-waitPenalty),0,100);
-    posMetrics[pos]={pool,demand,replacement,best,bestNext,waitCost,supplyRatio,availability,picksAway};
+    const availability=clamp(100*(.52*tierSurvive+.30*bestSurvive+.18*clamp((supplyRatio-.7)/1.4,0,1)),0,100);
+    posMetrics[pos]={pool,demand,replacement,best,tier,tierSurvive,bestSurvive,waitCost,availability,picksAway};
   }
-
-  const playerMetrics={};
+  const maxProj=Math.max(...available.map(x=>x.proj),1), playerMetrics={};
   for(const p of available){
-    const pm=posMetrics[p.pos];
-    const idx=pm.pool.findIndex(x=>x.name===p.name);
-    const fifth=pm.pool[Math.min(pm.pool.length-1,idx+5)];
-    const next5=Math.max(0,p.proj-(fifth?.proj||0));
-    const vorp=Math.max(0,p.proj-pm.replacement);
-    const maxProj=Math.max(...available.map(x=>x.proj),1);
-    const valueScore=clamp((p.proj/maxProj)*100,0,100);
-    const vorpScore=clamp(vorp/Math.max(1,p.proj)*140,0,100);
-    const dropScore=clamp(next5/Math.max(1,p.proj)*220,0,100);
-    const urgency=100-pm.availability;
-    const adpUrgency=clamp(100-((p.adpRank||180)-state.currentPick)*3.5,0,100);
-    const draftScore=clamp(.30*valueScore+.27*vorpScore+.18*dropScore+.15*urgency+.10*adpUrgency,0,100);
-    playerMetrics[p.name]={vorp,next5,waitCost:pm.waitCost,availability:pm.availability,draftScore};
+    const pm=posMetrics[p.pos], idx=pm.pool.findIndex(x=>x.name===p.name), fifth=pm.pool[Math.min(pm.pool.length-1,idx+5)];
+    const next5=Math.max(0,p.proj-(fifth?.proj||0)), vorp=Math.max(0,p.proj-pm.replacement), surv=survival[p.name]||0;
+    const valueScore=clamp(p.proj/maxProj*100,0,100), vorpScore=clamp(vorp/Math.max(1,p.proj)*145,0,100), dropScore=clamp(next5/Math.max(1,p.proj)*230,0,100);
+    const goneRisk=(1-surv)*100, tierRisk=(1-pm.tierSurvive)*100, adpUrgency=clamp(100-((p.adpRank||200)-state.currentPick)*3,0,100);
+    const draftScore=clamp(.25*valueScore+.23*vorpScore+.15*dropScore+.20*goneRisk+.10*tierRisk+.07*adpUrgency,0,100);
+    playerMetrics[p.name]={vorp,next5,survival:surv,tierSurvival:pm.tierSurvive,availability:pm.availability,waitCost:pm.waitCost,draftScore};
   }
   return {available,posMetrics,playerMetrics,nextDubsy,picksAway};
 }
-
 function recommendationReason(pos,m){
-  const a=m.availability;
-  if(a<40) return `${pos} is critically thin. Waiting ${m.picksAway} picks projects a ${m.waitCost.toFixed(1)}-point drop at the top.`;
-  if(a<75) return `${pos} depth is thinning. The top option is worth considering before your next turn.`;
-  return `${pos} remains deep enough to wait unless the player value is exceptional.`;
+  const gone=Math.round((1-m.bestSurvive)*100), tierGone=Math.round((1-m.tierSurvive)*100);
+  if(gone>=65||tierGone>=60) return `<b>TAKE NOW</b> — ${gone}% chance the top ${pos} is gone by your next pick; ${tierGone}% chance this tier disappears.`;
+  if(gone>=35||tierGone>=35) return `<b>LEAN TAKE</b> — meaningful drop risk: ${gone}% top-player risk, ${tierGone}% tier risk.`;
+  return `<b>WAIT</b> — only ${gone}% chance the top ${pos} is gone; comparable options are likely to survive.`;
 }
-
 function renderHeader(m){
   document.getElementById("pickNow").textContent=state.currentPick;
   document.getElementById("roundNow").textContent=roundLabel(state.currentPick);
@@ -252,25 +260,17 @@ function renderHeader(m){
 }
 
 function renderRecommendations(m){
-  const candidates=POSITIONS.map(pos=>{
-    const best=m.posMetrics[pos].best;
-    return best?{...best,metric:m.playerMetrics[best.name],pm:m.posMetrics[pos]}:null;
-  }).filter(Boolean).sort((a,b)=>b.metric.draftScore-a.metric.draftScore);
-  const top=candidates[0];
-  let html="";
+  const candidates=POSITIONS.map(pos=>{const best=m.posMetrics[pos].best;return best?{...best,metric:m.playerMetrics[best.name],pm:m.posMetrics[pos]}:null;}).filter(Boolean).sort((a,b)=>b.metric.draftScore-a.metric.draftScore);
+  const top=candidates[0]; let html="";
   if(top){
-    html+=`<div class="best"><div class="label">Best Pick Right Now</div><div class="name">${top.name} <span style="color:#9db0ca;font-size:14px">${top.pos}</span></div><div class="why">${recommendationReason(top.pos,top.pm)} Draft score ${top.metric.draftScore.toFixed(0)}.</div><button class="draftbtn" style="margin-top:10px" data-draft="${encodeURIComponent(top.name)}">Draft ${top.name}</button></div>`;
+    html+=`<div class="best"><div class="label">Best Pick Right Now</div><div class="name">${top.name} <span style="color:#9db0ca;font-size:14px">${top.pos}</span></div><div class="why">${recommendationReason(top.pos,top.pm)}<br>Player survives: ${Math.round(top.pm.bestSurvive*100)}% • Tier survives: ${Math.round(top.pm.tierSurvive*100)}% • Draft score ${top.metric.draftScore.toFixed(0)}.</div><button class="draftbtn" style="margin-top:10px" data-draft="${encodeURIComponent(top.name)}">Draft ${top.name}</button></div>`;
   }
   for(const pos of POSITIONS){
     const pm=m.posMetrics[pos],best=pm.best,metric=best?m.playerMetrics[best.name]:null;
-    html+=`<div class="poscard"><div class="pos">${pos} <span class="scarcity ${pctClass(pm.availability)}">${pm.availability.toFixed(0)}</span></div>
-      <div class="player">${best?best.name:"—"}</div>
-      <div class="scorebar"><i style="width:${pm.availability}%"></i></div>
-      <div class="small">Wait cost: ${pm.waitCost.toFixed(1)} pts<br>Replacement: ${pm.replacement.toFixed(1)}<br>Draft score: ${metric?metric.draftScore.toFixed(0):"—"}</div></div>`;
+    html+=`<div class="poscard"><div class="pos">${pos} <span class="scarcity ${pctClass(pm.availability)}">${pm.availability.toFixed(0)}</span></div><div class="player">${best?best.name:"—"}</div><div style="font-size:18px;font-weight:900;margin-top:6px">${Math.round(pm.bestSurvive*100)}% <span class="small">survives</span></div><div class="scorebar"><i style="width:${pm.tierSurvive*100}%"></i></div><div class="small">Tier survives: ${Math.round(pm.tierSurvive*100)}%<br>Wait cost: ${pm.waitCost.toFixed(1)} pts<br>Draft score: ${metric?metric.draftScore.toFixed(0):"—"}</div></div>`;
   }
   document.getElementById("recommendations").innerHTML=html;
 }
-
 function visibleRows(m){
   let rows=PLAYER_DATA.filter(p=>{
     if(activePos==="DRAFTED") return isDrafted(p);
@@ -282,7 +282,7 @@ function visibleRows(m){
   if(activePos==="DRAFTED") return rows.sort((a,b)=>(a.adpRank??999)-(b.adpRank??999));
   if(sortBy==="adp") rows.sort((a,b)=>(a.adpRank??999)-(b.adpRank??999));
   if(sortBy==="proj") rows.sort((a,b)=>b.proj-a.proj);
-  if(sortBy==="scarcity") rows.sort((a,b)=>(m.playerMetrics[a.name]?.availability??100)-(m.playerMetrics[b.name]?.availability??100));
+  if(sortBy==="scarcity") rows.sort((a,b)=>(m.playerMetrics[a.name]?.survival??1)-(m.playerMetrics[b.name]?.survival??1));
   if(sortBy==="recommend") rows.sort((a,b)=>(m.playerMetrics[b.name]?.draftScore??-1)-(m.playerMetrics[a.name]?.draftScore??-1));
   return rows;
 }
@@ -298,8 +298,8 @@ function renderBoard(m){
       <td class="metric">${p.sfAdp||p.adpRank}</td>
       <td class="metric">${p.proj.toFixed(1)}</td>
       <td class="metric">${x?x.vorp.toFixed(1):"—"}</td>
-      <td class="metric">${x?x.waitCost.toFixed(1):"—"}</td>
-      <td class="metric scarcity ${x?pctClass(x.availability):""}">${x?x.availability.toFixed(0):"—"}</td>
+      <td class="metric">${x?Math.round(x.survival*100)+"%":"—"}</td>
+      <td class="metric">${x?Math.round(x.tierSurvival*100)+"%":"—"}</td>
       <td class="metric"><b>${x?x.draftScore.toFixed(0):"—"}</b></td>
       <td title="${p.injuryReport.replace(/"/g,"&quot;")}">${p.injury||"—"}</td>
       <td>${d?"":`<button class="draftbtn" data-draft="${encodeURIComponent(p.name)}">Draft</button>`}</td>
@@ -307,9 +307,42 @@ function renderBoard(m){
   }).join("");
 }
 
+function normalizeTeams(){
+  state.teams=clamp(+state.teams||12,8,16); state.dubsySlot=clamp(+state.dubsySlot||1,1,state.teams); state.rounds=clamp(+state.rounds||15,8,25);
+  if(!Array.isArray(state.teamNames)) state.teamNames=[];
+  state.teamNames=Array.from({length:state.teams},(_,i)=>state.teamNames[i]||`Team ${i+1}`);
+}
+function buildTeamNameFields(){
+  const n=clamp(+document.getElementById("teamsInput").value||state.teams,8,16);
+  const old=[...document.querySelectorAll(".teamNameInput")].map(x=>x.value);
+  document.getElementById("teamNameFields").innerHTML=Array.from({length:n},(_,i)=>`<label class="note">Team ${i+1}<input class="teamNameInput" value="${(old[i]||state.teamNames?.[i]||`Team ${i+1}`).replace(/"/g,'&quot;')}" style="width:100%;margin-top:4px"></label>`).join("");
+  document.getElementById("slotInput").max=n;
+}
+function renderDraftGrid(){
+  normalizeTeams(); const g=document.getElementById("draftGrid"); if(!g)return;
+  g.style.gridTemplateColumns=`42px repeat(${state.teams},110px)`; let h='<div class="draftRound">Rnd</div>';
+  for(let slot=1;slot<=state.teams;slot++) h+=`<div class="draftTeamHead">${state.teamNames[slot-1]}</div>`;
+  for(let r=1;r<=state.rounds;r++){
+    h+=`<div class="draftRound">${r}</div>`;
+    for(let display=1;display<=state.teams;display++){
+      const slot=r%2===1?display:state.teams-display+1;
+      const pick=(r-1)*state.teams+(r%2===1?display:state.teams-display+1);
+      const e=state.draftedLive.find(x=>x.pick===pick), p=e?PLAYER_DATA.find(z=>z.name===e.name):null;
+      if(e) h+=`<div class="draftCell ${(p?.pos||'').toLowerCase()}"><div class="draftMeta">${p?.pos||''} • ${r}.${String(slot).padStart(2,'0')} • #${pick}</div><div class="draftName">${e.name}</div><div class="draftTeam">${e.team}</div></div>`;
+      else h+=`<div class="draftCell empty"><div class="draftMeta">${r}.${String(slot).padStart(2,'0')} • #${pick}</div><div class="draftName">${pick===state.currentPick?'ON CLOCK':'—'}</div></div>`;
+    }
+  }
+  g.innerHTML=h;
+}
+function showDraftBoard(show=true){
+  document.querySelectorAll('.app > .card').forEach(c=>{if(c.id!=="draftBoardCard")c.style.display=show?'none':''});
+  document.getElementById("draftBoardCard").style.display=show?'block':'none';
+  if(show) renderDraftGrid();
+}
 function render(){
+  normalizeTeams();
   const m=metrics();
-  renderHeader(m);renderRecommendations(m);renderBoard(m);saveState();
+  renderHeader(m);renderRecommendations(m);renderBoard(m);if(document.getElementById("draftBoardCard")?.style.display==="block")renderDraftGrid();saveState();
 }
 
 window.draftPlayer=function(name){
@@ -339,7 +372,8 @@ document.addEventListener("click", e => {
 
 document.getElementById("undoBtn").onclick=undo;
 document.getElementById("advanceBtn").onclick=advance;
-document.getElementById("jumpBtn").onclick=()=>{activePos="ALL";sortBy="recommend";document.getElementById("sortBy").value="recommend";document.getElementById("search").value="";document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.pos==="ALL"));render();window.scrollTo({top:300,behavior:"smooth"});};
+document.getElementById("jumpBtn").onclick=()=>{showDraftBoard(true);window.scrollTo({top:0,behavior:"smooth"});};
+document.getElementById("backToAssistant").onclick=()=>{showDraftBoard(false);};
 document.getElementById("search").oninput=()=>render();
 document.getElementById("sortBy").onchange=e=>{sortBy=e.target.value;render()};
 document.getElementById("tabs").onclick=e=>{if(!e.target.dataset.pos)return;activePos=e.target.dataset.pos;document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===e.target));render();};
@@ -349,11 +383,12 @@ document.getElementById("settingsBtn").onclick=()=>{syncSettings();modal.classLi
 document.getElementById("closeSettings").onclick=()=>modal.classList.remove("show");
 modal.onclick=e=>{if(e.target===modal)modal.classList.remove("show")};
 function syncSettings(){
-  teamsInput.value=state.teams;slotInput.value=state.dubsySlot;pickInput.value=state.currentPick;
+  teamsInput.value=state.teams;slotInput.value=state.dubsySlot;pickInput.value=state.currentPick;roundsInput.value=state.rounds;buildTeamNameFields();
   qbDemand.value=state.baseDemand.QB;rbDemand.value=state.baseDemand.RB;wrDemand.value=state.baseDemand.WR;teDemand.value=state.baseDemand.TE;
 }
+document.getElementById("teamsInput").onchange=buildTeamNameFields;
 document.getElementById("applySettings").onclick=()=>{
-  state.teams=+teamsInput.value||12;state.dubsySlot=clamp(+slotInput.value||9,1,state.teams);state.currentPick=Math.max(1,+pickInput.value||1);
+  state.teams=clamp(+teamsInput.value||12,8,16);state.dubsySlot=clamp(+slotInput.value||9,1,state.teams);state.currentPick=Math.max(1,+pickInput.value||1);state.rounds=clamp(+roundsInput.value||15,8,25);state.teamNames=[...document.querySelectorAll(".teamNameInput")].slice(0,state.teams).map((x,i)=>x.value.trim()||`Team ${i+1}`);
   state.baseDemand={QB:+qbDemand.value||15,RB:+rbDemand.value||28,WR:+wrDemand.value||44,TE:+teDemand.value||12};
   modal.classList.remove("show");render();
 };
@@ -361,7 +396,7 @@ document.getElementById("resetDraft").onclick=()=>{
   if(!confirm("Reset all live picks and return to pick 1?"))return;
   state.currentPick=1;state.draftedLive=[];state.history=[];saveState();modal.classList.remove("show");render();
 };
-loadState();render();
+loadState();normalizeTeams();render();
 </script>
 </body>
 </html>
