@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="DraftEdge" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="icon" href="icon.svg" />
+  <title>DraftEdge</title>
+  <style>
+    :root{
+      --bg:#0b0f14;--panel:#121821;--panel2:#171f2a;--text:#f4f7fb;--muted:#94a3b8;
+      --border:#273244;--accent:#42d392;--accent2:#77e6b6;--warn:#f59e0b;--danger:#ef4444;
+      --qb:#8b5cf6;--rb:#22c55e;--wr:#3b82f6;--te:#f59e0b;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#0b0f14,#0f1620);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,system-ui,sans-serif;min-height:100vh}
+    button,input,select{font:inherit}
+    .app{max-width:920px;margin:0 auto;padding:calc(12px + env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom))}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+    .brand h1{font-size:24px;margin:0}.brand p{margin:3px 0 0;color:var(--muted);font-size:13px}
+    .pill{background:#10231b;color:var(--accent2);border:1px solid #23563f;padding:7px 10px;border-radius:999px;font-size:12px;font-weight:700}
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+    .card{background:rgba(18,24,33,.96);border:1px solid var(--border);border-radius:16px;padding:13px}
+    .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+    .big{font-size:22px;font-weight:800;margin-top:4px}
+    .hero{padding:16px;margin-bottom:10px}
+    .hero-row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+    .hero h2{font-size:22px;margin:4px 0}.meta{font-size:13px;color:var(--muted)}
+    .score{min-width:70px;text-align:center;padding:9px;border-radius:12px;background:#153226;border:1px solid #2f6b50}
+    .score strong{display:block;font-size:22px}.reason{font-size:14px;line-height:1.45;margin:12px 0 0}
+    .tabs{display:flex;gap:7px;overflow-x:auto;padding:2px 0 8px}.tabs button{white-space:nowrap}
+    button{border:none;border-radius:12px;padding:10px 12px;background:#202938;color:var(--text);min-height:44px}
+    button.primary{background:var(--accent);color:#05120c;font-weight:800}
+    button.active{background:#264536;border:1px solid #3d7d5e}
+    button.ghost{border:1px solid var(--border);background:transparent}
+    .search{width:100%;background:#121821;color:var(--text);border:1px solid var(--border);border-radius:12px;padding:12px 13px;font-size:16px;margin-bottom:9px}
+    .player{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:10px;margin-bottom:8px}
+    .rank{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--panel2);font-weight:800;color:var(--muted)}
+    .name{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sub{font-size:12px;color:var(--muted);margin-top:3px}
+    .right{text-align:right}.dscore{font-weight:900;font-size:18px}.draft-btn{margin-top:5px;padding:7px 10px;min-height:36px;background:#193426;color:var(--accent2);border:1px solid #2f6b50}
+    .section-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:16px 1px 8px}.section-title h3{margin:0;font-size:16px}.section-title span{font-size:12px;color:var(--muted)}
+    .bar-row{display:grid;grid-template-columns:34px 1fr 34px;align-items:center;gap:9px;margin:10px 0}.bar-bg{height:10px;border-radius:999px;background:#202938;overflow:hidden}.bar{height:100%;border-radius:999px}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .roster{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.slot{padding:10px;border-radius:12px;background:var(--panel2);border:1px solid var(--border)}.slot b{display:block}.slot span{font-size:12px;color:var(--muted)}
+    .settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}.field input,.field select{width:100%;background:#0f151e;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px;font-size:16px}
+    .footer{color:var(--muted);font-size:11px;text-align:center;margin-top:18px}
+    .hidden{display:none}
+    @media(max-width:540px){.app{padding-left:10px;padding-right:10px}.stats{grid-template-columns:repeat(3,minmax(0,1fr))}.big{font-size:18px}.hero h2{font-size:20px}.roster{grid-template-columns:1fr}.settings-grid{grid-template-columns:1fr}.player{grid-template-columns:40px minmax(0,1fr) auto}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <h1>DraftEdge</h1>
+      <p>Live position scarcity draft assistant</p>
+    </div>
+    <div class="pill">V1 PWA</div>
+  </header>
+
+  <div class="stats">
+    <div class="card"><div class="label">Current pick</div><div id="pickNo" class="big">1.01</div></div>
+    <div class="card"><div class="label">Your next</div><div id="nextPick" class="big">1.08</div></div>
+    <div class="card"><div class="label">Players left</div><div id="leftCount" class="big">0</div></div>
+  </div>
+
+  <section class="card hero">
+    <div class="hero-row">
+      <div>
+        <div class="label">Best pick now</div>
+        <h2 id="bestName">—</h2>
+        <div id="bestMeta" class="meta">—</div>
+      </div>
+      <div class="score"><span class="label">Draft Score</span><strong id="bestScore">—</strong></div>
+    </div>
+    <p id="reason" class="reason">Draft a player to begin.</p>
+  </section>
+
+  <div class="tabs" id="viewTabs">
+    <button class="active" data-view="board">Draft Board</button>
+    <button data-view="roster">My Team</button>
+    <button data-view="settings">League Settings</button>
+  </div>
+
+  <section id="boardView">
+    <input id="search" class="search" placeholder="Search player…" />
+    <div class="tabs" id="posTabs">
+      <button class="active" data-pos="ALL">All</button>
+      <button data-pos="QB">QB</button><button data-pos="RB">RB</button><button data-pos="WR">WR</button><button data-pos="TE">TE</button>
+    </div>
+    <div id="playerList"></div>
+
+    <div class="section-title"><h3>Position Scarcity</h3><span>Higher = draft sooner</span></div>
+    <div class="card" id="scarcityBars"></div>
+
+    <div class="toolbar">
+      <button id="undoBtn" class="ghost">Undo Pick</button>
+      <button id="resetBtn" class="ghost">Reset Draft</button>
+    </div>
+  </section>
+
+  <section id="rosterView" class="hidden">
+    <div class="section-title"><h3>My Team</h3><span id="rosterCount">0 players</span></div>
+    <div class="roster" id="roster"></div>
+  </section>
+
+  <section id="settingsView" class="hidden">
+    <div class="section-title"><h3>League Settings</h3><span>Saved on this device</span></div>
+    <div class="card settings-grid">
+      <div class="field"><label>Teams</label><input id="teams" type="number" min="4" max="20" value="12"></div>
+      <div class="field"><label>Your draft slot</label><input id="slot" type="number" min="1" max="20" value="8"></div>
+      <div class="field"><label>QB starters</label><input id="qbStart" type="number" min="1" max="3" value="1"></div>
+      <div class="field"><label>RB starters</label><input id="rbStart" type="number" min="1" max="5" value="2"></div>
+      <div class="field"><label>WR starters</label><input id="wrStart" type="number" min="1" max="6" value="3"></div>
+      <div class="field"><label>TE starters</label><input id="teStart" type="number" min="0" max="3" value="1"></div>
+      <div class="field"><label>Flex starters</label><input id="flexStart" type="number" min="0" max="4" value="2"></div>
+      <div class="field"><label>Superflex starters</label><input id="sfStart" type="number" min="0" max="2" value="1"></div>
+      <div class="field"><label>PPR</label><select id="ppr"><option value="0">0</option><option value="0.5">0.5</option><option value="1" selected>1.0</option></select></div>
+      <div class="field"><label>Pass TD points</label><select id="passTD"><option value="4">4</option><option value="6" selected>6</option></select></div>
+    </div>
+    <div class="toolbar"><button id="saveSettings" class="primary">Save & Recalculate</button></div>
+  </section>
+
+  <div class="footer">DraftEdge stores draft state locally in your browser. No account required.</div>
+</div>
+
+<script>
+const basePlayers = [
+  ["Josh Allen","QB",26.8],["Jalen Hurts","QB",25.9],["Lamar Jackson","QB",25.3],["Jayden Daniels","QB",24.8],["Joe Burrow","QB",24.4],["Patrick Mahomes","QB",23.8],["Justin Herbert","QB",22.5],["Dak Prescott","QB",21.6],["Kyler Murray","QB",21.2],["Jordan Love","QB",20.7],["Baker Mayfield","QB",20.3],["Bo Nix","QB",19.9],
+  ["Bijan Robinson","RB",24.7],["Jahmyr Gibbs","RB",24.2],["Saquon Barkley","RB",23.5],["Breece Hall","RB",21.9],["Jonathan Taylor","RB",21.5],["De'Von Achane","RB",21.1],["Christian McCaffrey","RB",20.8],["James Cook","RB",19.9],["Kyren Williams","RB",19.3],["Josh Jacobs","RB",18.9],["Kenneth Walker III","RB",17.8],["Chase Brown","RB",17.4],
+  ["Ja'Marr Chase","WR",25.2],["Justin Jefferson","WR",24.6],["CeeDee Lamb","WR",23.9],["Malik Nabers","WR",23.2],["Amon-Ra St. Brown","WR",22.8],["Puka Nacua","WR",22.3],["Nico Collins","WR",21.6],["Drake London","WR",21.0],["Brian Thomas Jr.","WR",20.5],["A.J. Brown","WR",19.8],["Tee Higgins","WR",18.8],["DJ Moore","WR",17.7],["Garrett Wilson","WR",17.2],["Mike Evans","WR",16.8],["DeVonta Smith","WR",16.4],["DK Metcalf","WR",16.0],
+  ["Brock Bowers","TE",18.8],["Trey McBride","TE",18.2],["Sam LaPorta","TE",15.6],["George Kittle","TE",15.1],["Mark Andrews","TE",14.4],["T.J. Hockenson","TE",13.9],["Dalton Kincaid","TE",13.2],["Kyle Pitts","TE",12.8]
+].map((x,i)=>({id:i+1,name:x[0],pos:x[1],ppg:x[2]}));
+
+const defaults={teams:12,slot:8,qbStart:1,rbStart:2,wrStart:3,teStart:1,flexStart:2,sfStart:1,ppr:1,passTD:6,pick:1,drafted:[],myRoster:[]};
+let state=Object.assign({},defaults,JSON.parse(localStorage.getItem("draftedge_state")||"{}"));
+let filter="ALL", search="";
+
+function save(){localStorage.setItem("draftedge_state",JSON.stringify(state))}
+function available(){return basePlayers.filter(p=>!state.drafted.includes(p.id))}
+function replacementCount(pos){
+  const t=state.teams;
+  if(pos==="QB") return Math.max(1, Math.round(t*(+state.qbStart + +state.sfStart*0.78)));
+  if(pos==="RB") return Math.max(1, Math.round(t*(+state.rbStart + +state.flexStart*0.46)));
+  if(pos==="WR") return Math.max(1, Math.round(t*(+state.wrStart + +state.flexStart*0.46)));
+  if(pos==="TE") return Math.max(1, Math.round(t*(+state.teStart + +state.flexStart*0.08)));
+  return t;
+}
+function scored(){
+  const av=available();
+  const byPos={QB:[],RB:[],WR:[],TE:[]};
+  av.forEach(p=>byPos[p.pos].push(p));
+  Object.values(byPos).forEach(a=>a.sort((a,b)=>b.ppg-a.ppg));
+  const out=[];
+  for(const p of av){
+    const arr=byPos[p.pos];
+    const idx=arr.findIndex(x=>x.id===p.id);
+    const replIdx=Math.min(arr.length-1,replacementCount(p.pos)-1);
+    const repl=arr[replIdx]?.ppg ?? arr[arr.length-1]?.ppg ?? p.ppg;
+    const vorp=Math.max(0,p.ppg-repl);
+    const next=arr[Math.min(arr.length-1,idx+3)]?.ppg ?? p.ppg;
+    const drop=Math.max(0,p.ppg-next);
+    const startersNeeded={QB:+state.qbStart+state.sfStart,RB:+state.rbStart,WR:+state.wrStart,TE:+state.teStart};
+    const scarcity=Math.min(100,Math.max(0,100*(1-(arr.length/(Math.max(1,state.teams*startersNeeded[p.pos]*1.7))))));
+    const mine=state.myRoster.map(id=>basePlayers.find(x=>x.id===id)).filter(Boolean);
+    const have=mine.filter(x=>x.pos===p.pos).length;
+    const need=Math.max(0,startersNeeded[p.pos]-have);
+    const rosterNeed=Math.min(100,need*28);
+    const raw=vorp*3.2 + drop*7.5 + scarcity*.34 + rosterNeed*.12;
+    out.push({...p,vorp,drop,scarcity,rosterNeed,score:Math.round(Math.min(99,raw))});
+  }
+  return out.sort((a,b)=>b.score-a.score||b.vorp-a.vorp);
+}
+function fmtPick(n){
+  const teams=+state.teams, r=Math.floor((n-1)/teams)+1, s=((n-1)%teams)+1;
+  return `${r}.${String(s).padStart(2,"0")}`;
+}
+function myNextPick(){
+  const teams=+state.teams, slot=+state.slot, current=state.pick;
+  for(let n=current;n<current+teams*4;n++){
+    const round=Math.floor((n-1)/teams)+1, within=((n-1)%teams)+1;
+    const owner=round%2===1?within:(teams-within+1);
+    if(owner===slot) return n;
+  }
+  return current;
+}
+function render(){
+  document.querySelector("#pickNo").textContent=fmtPick(state.pick);
+  document.querySelector("#nextPick").textContent=fmtPick(myNextPick());
+  document.querySelector("#leftCount").textContent=available().length;
+  const s=scored(), best=s[0];
+  if(best){
+    document.querySelector("#bestName").textContent=best.name;
+    document.querySelector("#bestMeta").textContent=`${best.pos} · VORP +${best.vorp.toFixed(1)} · Scarcity ${best.scarcity.toFixed(0)}`;
+    document.querySelector("#bestScore").textContent=best.score;
+    const risk=Math.round(Math.min(99,best.drop*9 + best.scarcity*.35));
+    document.querySelector("#reason").textContent=`${best.pos} currently has the strongest blend of value above replacement and positional drop-off. Estimated wait risk: ${risk}/100.`;
+  }
+  const list=s.filter(p=>(filter==="ALL"||p.pos===filter)&&p.name.toLowerCase().includes(search.toLowerCase()));
+  document.querySelector("#playerList").innerHTML=list.map((p,i)=>`
+    <div class="player">
+      <div class="rank">${i+1}</div>
+      <div><div class="name">${p.name}</div><div class="sub">${p.pos} · VORP +${p.vorp.toFixed(1)} · Scarcity ${p.scarcity.toFixed(0)} · Drop ${p.drop.toFixed(1)}</div></div>
+      <div class="right"><div class="dscore">${p.score}</div><button class="draft-btn" data-id="${p.id}">Draft</button></div>
+    </div>`).join("") || `<div class="card meta">No players match this filter.</div>`;
+  const pos=["QB","RB","WR","TE"];
+  document.querySelector("#scarcityBars").innerHTML=pos.map((x,j)=>{
+    const a=s.filter(p=>p.pos===x); const val=a.length?Math.round(a[0].scarcity):100;
+    const color={QB:"var(--qb)",RB:"var(--rb)",WR:"var(--wr)",TE:"var(--te)"}[x];
+    return `<div class="bar-row"><b>${x}</b><div class="bar-bg"><div class="bar" style="width:${val}%;background:${color}"></div></div><b>${val}</b></div>`;
+  }).join("");
+  const roster=state.myRoster.map(id=>basePlayers.find(p=>p.id===id)).filter(Boolean);
+  document.querySelector("#rosterCount").textContent=`${roster.length} player${roster.length===1?"":"s"}`;
+  document.querySelector("#roster").innerHTML=roster.length?roster.map(p=>`<div class="slot"><b>${p.name}</b><span>${p.pos} · ${p.ppg.toFixed(1)} proj PPG</span></div>`).join(""):`<div class="card meta">Your drafted players will appear here automatically when the current pick belongs to your draft slot.</div>`;
+}
+function loadSettings(){
+  ["teams","slot","qbStart","rbStart","wrStart","teStart","flexStart","sfStart","ppr","passTD"].forEach(id=>document.querySelector("#"+id).value=state[id]);
+}
+document.querySelector("#playerList").addEventListener("click",e=>{
+  const b=e.target.closest("[data-id]"); if(!b) return;
+  const id=+b.dataset.id;
+  const teams=+state.teams, round=Math.floor((state.pick-1)/teams)+1, within=((state.pick-1)%teams)+1;
+  const owner=round%2===1?within:(teams-within+1);
+  state.drafted.push(id);
+  if(owner===+state.slot) state.myRoster.push(id);
+  state.pick++;
+  save(); render();
+});
+document.querySelector("#undoBtn").addEventListener("click",()=>{
+  if(!state.drafted.length)return;
+  state.pick=Math.max(1,state.pick-1);
+  const id=state.drafted.pop();
+  const i=state.myRoster.lastIndexOf(id); if(i>=0) state.myRoster.splice(i,1);
+  save(); render();
+});
+document.querySelector("#resetBtn").addEventListener("click",()=>{
+  if(confirm("Reset the entire draft?")){state.pick=1;state.drafted=[];state.myRoster=[];save();render()}
+});
+document.querySelector("#posTabs").addEventListener("click",e=>{
+  const b=e.target.closest("[data-pos]"); if(!b)return; filter=b.dataset.pos;
+  document.querySelectorAll("#posTabs button").forEach(x=>x.classList.toggle("active",x===b)); render();
+});
+document.querySelector("#search").addEventListener("input",e=>{search=e.target.value;render()});
+document.querySelector("#viewTabs").addEventListener("click",e=>{
+  const b=e.target.closest("[data-view]"); if(!b)return;
+  document.querySelectorAll("#viewTabs button").forEach(x=>x.classList.toggle("active",x===b));
+  ["board","roster","settings"].forEach(v=>document.querySelector("#"+v+"View").classList.toggle("hidden",v!==b.dataset.view));
+});
+document.querySelector("#saveSettings").addEventListener("click",()=>{
+  ["teams","slot","qbStart","rbStart","wrStart","teStart","flexStart","sfStart","ppr","passTD"].forEach(id=>state[id]=+document.querySelector("#"+id).value);
+  state.slot=Math.max(1,Math.min(state.teams,state.slot)); save(); render(); alert("League settings saved.");
+});
+loadSettings(); render();
+if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
+</script>
+</body>
+</html>
