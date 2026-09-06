@@ -56,6 +56,27 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
  h1{font-size:18px}
 }
 .draftTeamHead{background:#142238;border:1px solid var(--line);border-radius:7px;padding:7px 5px;font-size:10px;font-weight:900;text-align:center;width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.draftRound{background:#142238;border:1px solid var(--line);border-radius:7px;padding:6px;font-size:10px;font-weight:900;width:42px;display:flex;align-items:center;justify-content:center}.draftCell{width:110px;min-height:70px;border-radius:7px;padding:6px;color:#07111f}.draftCell.empty{background:#111d30;color:#71839c;border:1px dashed #30435f}.draftCell.qb{background:#e66a9b}.draftCell.rb{background:#78ddb8}.draftCell.wr{background:#55bde7}.draftCell.te{background:#f3a84e}.draftMeta{font-size:9px;font-weight:900;opacity:.75}.draftName{font-size:12px;font-weight:950;line-height:1.05;margin-top:5px}.draftTeam{font-size:9px;opacity:.75;margin-top:4px}
+
+.roster{display:flex;flex-direction:column;gap:8px}
+.rostergroup{margin-top:12px}
+.rostergroup h3{margin:0 0 8px;font-size:14px;color:#b9c9de}
+.rosterrow{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;background:#0d1728;border:1px solid #22344e;border-radius:12px;padding:9px 10px}
+.rosterslot{display:flex;align-items:center;justify-content:center;height:42px;border-radius:10px;background:#1b2946;font-weight:950;font-size:14px;letter-spacing:.03em}
+.rosterslot.qbslot{color:#ff5b8b}.rosterslot.rbslot{color:#39d7c3}.rosterslot.wrslot{color:#58b7ff}.rosterslot.teslot{color:#f0a34d}.rosterslot.flexslot{color:#52d9ce}.rosterslot.sflexslot{background:linear-gradient(180deg,#1b2946,#18253f);color:#dbe7fb}.rosterslot.benchslot{color:#9fb3cf}
+.rostername{font-weight:900;font-size:15px}.rostermeta{font-size:11px;color:#91a4bf;margin-top:2px}.rosterempty{color:#a9bdd8;font-weight:800}
+.rosterpick{font-size:11px;color:#91a4bf;text-align:right}
+.playerscarcity{margin-top:4px}
+.playerscarcity .labelrow{display:flex;justify-content:space-between;gap:8px;font-size:9.5px;color:#8ea2bc}
+.playerscarcity .bar{height:5px;background:#22344d;border-radius:999px;overflow:hidden;margin-top:3px}
+.playerscarcity .bar i{display:block;height:100%}
+
+
+.rosterneeds{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:8px}
+.needcard{background:#101b2d;border:1px solid #273955;border-radius:11px;padding:8px}
+.needcard .nlabel{font-size:10px;color:#95a6be;text-transform:uppercase}
+.needcard .nvalue{font-size:16px;font-weight:950;margin-top:3px}
+.needcard .nsmall{font-size:9.5px;color:#95a6be;margin-top:2px}
+@media(max-width:760px){.rosterneeds{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -100,7 +121,7 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
     <div class="tablewrap">
       <table>
         <thead><tr>
-          <th>Player</th><th>Pos</th><th>ADP</th><th>Proj</th><th>VORP</th><th>Survive</th><th>Tier Survive</th><th>Draft Score</th><th>Injury</th><th></th>
+          <th>Player</th><th>Pos</th><th>ADP</th><th>Proj</th><th>VORP</th><th>Survive</th><th>Tier Survive</th><th>Roster Need</th><th>Draft Score</th><th>Injury</th><th></th>
         </tr></thead>
         <tbody id="board"></tbody>
       </table>
@@ -117,7 +138,7 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
   <div class="footerinner">
     <button class="btn undo" id="undoBtn">Undo Pick</button>
     <button class="btn" id="jumpBtn">Draft Board</button>
-    <button class="btn primary" id="advanceBtn">Advance Pick</button>
+    <button class="btn primary" id="myTeamBtn">My Team</button>
   </div>
 </div>
 
@@ -209,6 +230,43 @@ function playerSurvivalProbability(p,picksAway,draftedByPos){
   }
   return clamp(survive,0,1);
 }
+
+function myRosterCounts(){
+  const counts={QB:0,RB:0,WR:0,TE:0};
+  for(const x of myPicks()){
+    if(counts[x.player.pos]!=null) counts[x.player.pos]++;
+  }
+  return counts;
+}
+function rosterNeedProfile(){
+  const counts=myRosterCounts();
+  // Targets reflect this league's 1QB/2RB/2WR/1TE/WRT/Superflex starting structure,
+  // with practical depth targets for a live draft.
+  const targets={QB:2,RB:4,WR:4,TE:2};
+  const minimum={QB:1,RB:2,WR:2,TE:1};
+  const need={},boost={};
+  for(const pos of POSITIONS){
+    const have=counts[pos]||0;
+    const starterGap=Math.max(0,minimum[pos]-have);
+    const targetGap=Math.max(0,targets[pos]-have);
+    let score=starterGap*48 + targetGap*16;
+    if(pos==="QB" && have<2) score += have===0 ? 32 : 22; // superflex premium
+    if(have>=targets[pos]) score -= 26*(have-targets[pos]+1);
+    need[pos]=clamp(score,0,100);
+    boost[pos]=clamp(0.88 + need[pos]/100*0.42,0.80,1.30);
+  }
+  return {counts,targets,minimum,need,boost};
+}
+function renderRosterNeeds(){
+  const r=rosterNeedProfile();
+  const el=document.getElementById("rosterNeeds");
+  if(!el) return;
+  el.innerHTML=POSITIONS.map(pos=>{
+    const n=r.need[pos],label=n>=70?"High need":n>=40?"Moderate need":"Low need";
+    return `<div class="needcard"><div class="nlabel">${pos} roster need</div><div class="nvalue">${r.counts[pos]}/${r.targets[pos]}</div><div class="nsmall">${label} • score ${Math.round(n)}</div></div>`;
+  }).join("");
+}
+
 function metrics(){
   const available=PLAYER_DATA.filter(p=>!isDrafted(p));
   const draftedByPos={QB:0,RB:0,WR:0,TE:0};
@@ -241,8 +299,10 @@ function metrics(){
     const next5=Math.max(0,p.proj-(fifth?.proj||0)), vorp=Math.max(0,p.proj-pm.replacement), surv=survival[p.name]||0;
     const valueScore=clamp(p.proj/maxProj*100,0,100), vorpScore=clamp(vorp/Math.max(1,p.proj)*145,0,100), dropScore=clamp(next5/Math.max(1,p.proj)*230,0,100);
     const goneRisk=(1-surv)*100, tierRisk=(1-pm.tierSurvive)*100, adpUrgency=clamp(100-((p.adpRank||200)-state.currentPick)*3,0,100);
-    const draftScore=clamp(.25*valueScore+.23*vorpScore+.15*dropScore+.20*goneRisk+.10*tierRisk+.07*adpUrgency,0,100);
-    playerMetrics[p.name]={vorp,next5,survival:surv,tierSurvival:pm.tierSurvive,availability:pm.availability,waitCost:pm.waitCost,draftScore};
+    const rosterScore=rosterNeed.need[p.pos]||0;
+    const rosterBoost=rosterNeed.boost[p.pos]||1;
+    const draftScore=clamp((.21*valueScore+.19*vorpScore+.13*dropScore+.18*goneRisk+.09*tierRisk+.06*adpUrgency+.14*rosterScore)*rosterBoost,0,100);
+    playerMetrics[p.name]={vorp,next5,survival:surv,tierSurvival:pm.tierSurvive,availability:pm.availability,waitCost:pm.waitCost,draftScore,rosterScore};
   }
   return {available,posMetrics,playerMetrics,nextDubsy,picksAway};
 }
@@ -263,7 +323,7 @@ function renderRecommendations(m){
   const candidates=POSITIONS.map(pos=>{const best=m.posMetrics[pos].best;return best?{...best,metric:m.playerMetrics[best.name],pm:m.posMetrics[pos]}:null;}).filter(Boolean).sort((a,b)=>b.metric.draftScore-a.metric.draftScore);
   const top=candidates[0]; let html="";
   if(top){
-    html+=`<div class="best"><div class="label">Best Pick Right Now</div><div class="name">${top.name} <span style="color:#9db0ca;font-size:14px">${top.pos}</span></div><div class="why">${recommendationReason(top.pos,top.pm)}<br>Player survives: ${Math.round(top.pm.bestSurvive*100)}% • Tier survives: ${Math.round(top.pm.tierSurvive*100)}% • Draft score ${top.metric.draftScore.toFixed(0)}.</div><button class="draftbtn" style="margin-top:10px" data-draft="${encodeURIComponent(top.name)}">Draft ${top.name}</button></div>`;
+    html+=`<div class="best"><div class="label">Best Pick Right Now</div><div class="name">${top.name} <span style="color:#9db0ca;font-size:14px">${top.pos}</span></div><div class="why">${recommendationReason(top.pos,top.pm)}<br>Player survives: ${Math.round(top.pm.bestSurvive*100)}% • Tier survives: ${Math.round(top.pm.tierSurvive*100)}% • Roster need ${Math.round(top.metric.rosterScore||0)} • Draft score ${top.metric.draftScore.toFixed(0)}.</div><button class="draftbtn" style="margin-top:10px" data-draft="${encodeURIComponent(top.name)}">Draft ${top.name}</button></div>`;
   }
   for(const pos of POSITIONS){
     const pm=m.posMetrics[pos],best=pm.best,metric=best?m.playerMetrics[best.name]:null;
@@ -300,7 +360,7 @@ function renderBoard(m){
       <td class="metric">${x?x.vorp.toFixed(1):"—"}</td>
       <td class="metric">${x?Math.round(x.survival*100)+"%":"—"}</td>
       <td class="metric">${x?Math.round(x.tierSurvival*100)+"%":"—"}</td>
-      <td class="metric"><b>${x?x.draftScore.toFixed(0):"—"}</b></td>
+      <td class="metric">${x?Math.round(x.rosterScore||0):"—"}</td><td class="metric"><b>${x?x.draftScore.toFixed(0):"—"}</b></td>
       <td title="${p.injuryReport.replace(/"/g,"&quot;")}">${p.injury||"—"}</td>
       <td>${d?"":`<button class="draftbtn" data-draft="${encodeURIComponent(p.name)}">Draft</button>`}</td>
     </tr>`;
@@ -339,6 +399,73 @@ function showDraftBoard(show=true){
   document.getElementById("draftBoardCard").style.display=show?'block':'none';
   if(show) renderDraftGrid();
 }
+
+function myPicks(){
+  const myTeam=state.teamNames[state.mySlot-1]||`Team ${state.mySlot}`;
+  return state.draftedLive
+    .filter(x=>x.team===myTeam)
+    .sort((a,b)=>a.pick-b.pick)
+    .map(x=>({...x,player:PLAYER_DATA.find(p=>p.name===x.name)}))
+    .filter(x=>x.player);
+}
+function eligibleForSlot(pos,slot){
+  if(slot==="QB") return pos==="QB";
+  if(slot==="RB") return pos==="RB";
+  if(slot==="WR") return pos==="WR";
+  if(slot==="TE") return pos==="TE";
+  if(slot==="WRT") return ["WR","RB","TE"].includes(pos);
+  if(slot==="SF") return ["QB","WR","RB","TE"].includes(pos);
+  return true;
+}
+function buildRoster(){
+  const starters=[
+    {key:"QB",label:"QB",cls:"qbslot"},
+    {key:"RB",label:"RB",cls:"rbslot"},
+    {key:"RB",label:"RB",cls:"rbslot"},
+    {key:"WR",label:"WR",cls:"wrslot"},
+    {key:"WR",label:"WR",cls:"wrslot"},
+    {key:"TE",label:"TE",cls:"teslot"},
+    {key:"WRT",label:"WRT",cls:"flexslot"},
+    {key:"SF",label:"WRTQ",cls:"sflexslot"}
+  ];
+  const picks=myPicks().map(x=>({...x,used:false}));
+  const rows=[];
+  for(const s of starters){
+    const idx=picks.findIndex(x=>!x.used&&eligibleForSlot(x.player.pos,s.key));
+    if(idx>=0){picks[idx].used=true;rows.push({...s,entry:picks[idx]});}
+    else rows.push({...s,entry:null});
+  }
+  const bench=picks.filter(x=>!x.used);
+  return {rows,bench};
+}
+function renderMyTeam(){
+  const myName=state.teamNames[state.mySlot-1]||`Team ${state.mySlot}`;
+  $("myTeamNameLabel").textContent=myName;
+  const {rows,bench}=buildRoster();
+  let h='<div class="roster">';
+  rows.forEach(r=>{
+    const e=r.entry;
+    h+=`<div class="rosterrow">
+      <div class="rosterslot ${r.cls}">${r.label}</div>
+      <div>${e?`<div class="rostername">${e.player.name}</div><div class="rostermeta">${e.player.pos} • Proj ${e.player.proj.toFixed(1)} • ADP ${e.player.sfAdp||e.player.adpRank}</div>`:`<div class="rosterempty">Empty</div>`}</div>
+      <div class="rosterpick">${e?`Pick ${e.pick}`:""}</div>
+    </div>`;
+  });
+  h+='</div>';
+  h+='<div class="rostergroup"><h3>Bench</h3><div class="roster">';
+  const benchSlots=Math.max(6,bench.length);
+  for(let i=0;i<benchSlots;i++){
+    const e=bench[i];
+    h+=`<div class="rosterrow">
+      <div class="rosterslot benchslot">BN</div>
+      <div>${e?`<div class="rostername">${e.player.name}</div><div class="rostermeta">${e.player.pos} • Proj ${e.player.proj.toFixed(1)} • ADP ${e.player.sfAdp||e.player.adpRank}</div>`:`<div class="rosterempty">Empty</div>`}</div>
+      <div class="rosterpick">${e?`Pick ${e.pick}`:""}</div>
+    </div>`;
+  }
+  h+='</div></div>';
+  $("myRoster").innerHTML=h;
+}
+
 function render(){
   normalizeTeams();
   const m=metrics();
