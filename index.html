@@ -268,6 +268,7 @@ function renderRosterNeeds(){
 }
 
 function metrics(){
+  const rosterNeed=rosterNeedProfile();
   const available=PLAYER_DATA.filter(p=>!isDrafted(p));
   const draftedByPos={QB:0,RB:0,WR:0,TE:0};
   state.draftedLive.forEach(x=>{const p=PLAYER_DATA.find(z=>z.name===x.name);if(p&&draftedByPos[p.pos]!==undefined) draftedByPos[p.pos]++;});
@@ -304,7 +305,7 @@ function metrics(){
     const draftScore=clamp((.21*valueScore+.19*vorpScore+.13*dropScore+.18*goneRisk+.09*tierRisk+.06*adpUrgency+.14*rosterScore)*rosterBoost,0,100);
     playerMetrics[p.name]={vorp,next5,survival:surv,tierSurvival:pm.tierSurvive,availability:pm.availability,waitCost:pm.waitCost,draftScore,rosterScore};
   }
-  return {available,posMetrics,playerMetrics,nextDubsy,picksAway};
+  return {available,posMetrics,playerMetrics,nextDubsy,picksAway,rosterNeed};
 }
 function recommendationReason(pos,m){
   const gone=Math.round((1-m.bestSurvive)*100), tierGone=Math.round((1-m.tierSurvive)*100);
